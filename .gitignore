@@ -1,0 +1,18 @@
+# Compilation
+target/
+*.class
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# Kafka Logs (Très important !)
+/webapp/*.json
+/data/
+kafka-logs/
+zookeeper-data/
+
+# OS
+.DS_Store
+Thumbs.db

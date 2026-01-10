@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Supervision Transport Scolaire</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Orbitron:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- STYLE GLOBAL --- */
+        body { margin: 0; font-family: 'Poppins', sans-serif; display: flex; height: 100vh; overflow: hidden; background: #ecf0f1; }
+
+        /* --- SIDEBAR GAUCHE (ADMIN) --- */
+        .sidebar {
+            width: 340px; background: #2c3e50; color: white; padding: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.3); z-index: 2000;
+            overflow-y: auto;
+        }
+
+        h2 { margin: 0; font-size: 1.1em; border-bottom: 3px solid #3498db; padding-bottom: 10px; color: #ecf0f1; letter-spacing: 1px; }
+
+        /* Formulaire */
+        .form-group { display: flex; flex-direction: column; gap: 5px; font-size: 0.9em; }
+        label { color: #bdc3c7; font-size: 0.8em; }
+        input { padding: 10px; border-radius: 5px; border: none; background: #34495e; color: white; font-family: 'Poppins', sans-serif; }
+        input:focus { outline: 2px solid #3498db; background: #3e5871; }
+
+        button.btn-add {
+            padding: 12px; background: #27ae60; color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s;
+            margin-top: 10px; font-size: 1em;
+        }
+        button.btn-add:hover { background: #2ecc71; transform: translateY(-2px); }
+
+        /* Liste des Familles */
+        .family-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+        .family-item {
+            background: rgba(255,255,255,0.05); padding: 12px; margin-bottom: 8px;
+            border-radius: 6px; display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.9em; border-left: 4px solid #95a5a6; transition: 0.3s;
+        }
+
+        /* Statuts Visuels */
+        .family-item.done { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.15); } /* Vert */
+        .family-item.wait { border-left-color: #f39c12; } /* Jaune */
+
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.7em; font-weight: bold; text-transform: uppercase; }
+        .badge-wait { background: #f39c12; color: #2c3e50; }
+        .badge-ok { background: #27ae60; color: white; }
+
+        .penality-tag { color: #e74c3c; font-weight: bold; font-size: 0.85em; margin-right: 8px; display: inline-flex; align-items: center; gap: 4px; }
+
+        /* --- CARTE CENTRALE --- */
+        #map { flex-grow: 1; height: 100%; z-index: 1; }
+
+        /* --- DASHBOARD BUS (FLOTTANT) --- */
+        .bus-dashboard {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 260px;
+            backdrop-filter: blur(5px); border-left: 6px solid #e67e22;
+        }
+
+        .db-header { color: #d35400; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; font-size: 1.2em; }
+        .db-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; font-size: 0.9em; }
+        .db-val { font-weight: bold; color: #2c3e50; }
+        .gps-box {
+            background: #2c3e50; color: #00ffcc; font-family: 'Orbitron', monospace;
+            padding: 10px; border-radius: 5px; text-align: center;
+            font-size: 0.9em; letter-spacing: 1px; margin-top: 10px;
+        }
+
+        /* --- NOTIFICATIONS --- */
+        .alert-box {
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 3000; padding: 15px 40px; border-radius: 50px; color: white;
+            font-weight: bold; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            display: none; animation: slideDown 0.5s ease-out;
+        }
+        .alert-red { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+        .alert-green { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+
+        @keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 30px; opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>🛠️ Administration</h2>
+
+    <div class="form-group">
+        <label>Nom de la Famille</label>
+        <input type="text" id="input-nom" placeholder="Ex: Famille Martin">
+    </div>
+    <div class="form-group">
+        <label>Position (Cliquez sur la carte)</label>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="input-lat" placeholder="Lat" readonly style="width:50%">
+            <input type="text" id="input-lon" placeholder="Lon" readonly style="width:50%">
+        </div>
+    </div>
+    <button class="btn-add" onclick="ajouterFamille()">
+        <i class="fas fa-plus-circle"></i> AJOUTER FAMILLE
+    </button>
+
+    <h2 style="margin-top:25px; border-color: #27ae60;">📋 Liste Passagers</h2>
+    <ul id="family-list-container" class="family-list">
+        <li style="text-align:center; color:#95a5a6; padding:20px;">Chargement...</li>
+    </ul>
+
+    <div style="margin-top:auto; font-size:0.7em; text-align:center; color:#7f8c8d;">
+        Système connecté • Port 8080
+    </div>
+</div>
+
+<div id="map"></div>
+
+<div class="bus-dashboard">
+    <div class="db-header"><i class="fas fa-bus-alt"></i> <b>Bus Scolaire #1</b></div>
+
+    <div class="db-row">
+        <span>STATUT</span>
+        <span id="bus-status" style="background:#95a5a6; color:white; padding:2px 8px; border-radius:4px; font-size:0.8em;">--</span>
+    </div>
+    <div class="db-row">
+        <span>DESTINATION</span>
+        <span id="bus-target" class="db-val">--</span>
+    </div>
+    <div class="db-row">
+        <span>ETA (TEMPS)</span>
+        <span id="bus-eta" style="color:#e67e22; font-size:1.3em; font-weight:800;">--</span>
+    </div>
+
+    <div class="gps-box">
+        Lat: <span id="lat-val">00.0000</span><br>
+        Lon: <span id="lon-val">00.0000</span>
+    </div>
+
+    <div id="penalty-info" style="display:none; margin-top:15px; text-align:center; color:#c0392b;">
+        <i class="fas fa-stopwatch"></i> Temps d'arrêt<br>
+        <b id="counter-val" style="font-size:1.5em;">0s</b>
+    </div>
+</div>
+
+<div id="notif-box" class="alert-box">Message</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // --- INITIALISATION CARTE ---
+    var map = L.map('map', {zoomControl: false}).setView([34.0020, -6.7900], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // --- ICONES ---
+    var busIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png', iconSize: [50, 50], iconAnchor: [25, 25] });
+    var schoolIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/167/167707.png', iconSize: [40, 40] });
+    var homeIconWait = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png', iconSize: [30, 30] });
+    var homeIconDone = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/190/190411.png', iconSize: [30, 30] });
+
+    var busMarker = null;
+    var markersLayer = L.layerGroup().addTo(map);
+    var tempMarker = null;
+
+    // Marqueur École
+    L.marker([34.0000, -6.8000], {icon: schoolIcon}).addTo(map).bindPopup("<b>🏫 ÉCOLE / DÉPÔT</b>");
+
+    // ---------------------------------------------------------
+    // 1. GESTION DU CLIC SUR LA CARTE (Pour ajouter une famille)
+    // ---------------------------------------------------------
+    map.on('click', function(e) {
+        var lat = e.latlng.lat.toFixed(5);
+        var lon = e.latlng.lng.toFixed(5);
+
+        document.getElementById('input-lat').value = lat;
+        document.getElementById('input-lon').value = lon;
+
+        if(tempMarker) map.removeLayer(tempMarker);
+        tempMarker = L.marker(e.latlng).addTo(map).bindPopup("Nouvelle position").openPopup();
+    });
+
+    // ---------------------------------------------------------
+    // 2. FONCTION AJOUTER FAMILLE (Appel API)
+    // ---------------------------------------------------------
+    function ajouterFamille() {
+        var nom = document.getElementById('input-nom').value;
+        var lat = document.getElementById('input-lat').value;
+        var lon = document.getElementById('input-lon').value;
+
+        if(!nom || !lat) { alert("❌ Veuillez entrer un nom et cliquer sur la carte !"); return; }
+
+        // URL COMPLÈTE DU SERVEUR (Fixe le problème CORS/Port)
+        fetch('http://localhost:8080/api/parents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nom: nom, lat: lat, lon: lon })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "success") {
+                    alert("✅ Famille ajoutée avec succès !");
+                    document.getElementById('input-nom').value = "";
+                    if(tempMarker) map.removeLayer(tempMarker);
+                    loadFamilies(); // Rafraîchir la liste
+                } else {
+                    alert("❌ Erreur serveur.");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("❌ Erreur de connexion au serveur (Vérifiez qu'il est lancé).");
+            });
+    }
+
+    // ---------------------------------------------------------
+    // 3. CHARGEMENT DES FAMILLES (Liste + Marqueurs)
+    // ---------------------------------------------------------
+    function loadFamilies() {
+        fetch('parents.json?t=' + Date.now())
+            .then(r => r.json())
+            .then(data => {
+                markersLayer.clearLayers();
+                var listHtml = "";
+
+                if(data.length === 0) listHtml = "<li style='text-align:center; padding:10px; color:#bdc3c7;'>Aucune famille enregistrée</li>";
+
+                data.forEach(fam => {
+                    var isDone = (fam.statut === "MONTE");
+                    var icon = isDone ? homeIconDone : homeIconWait;
+
+                    // Badge Statut
+                    var badgeClass = isDone ? "badge-ok" : "badge-wait";
+                    var badgeText = isDone ? "A BORD" : "EN ATTENTE";
+                    var rowClass = isDone ? "family-item done" : "family-item";
+
+                    // Gestion Pénalité (Triangle Rouge)
+                    var penaltyHtml = "";
+                    if (fam.penalites > 0) {
+                        penaltyHtml = `<span class="penality-tag"><i class="fas fa-exclamation-triangle"></i> ${fam.penalites}</span>`;
+                    }
+
+                    // Ajouter marqueur sur la carte
+                    L.marker([fam.lat, fam.lon], {icon: icon})
+                        .addTo(markersLayer)
+                        .bindPopup(`<b>${fam.nom}</b><br>Statut: ${fam.statut}<br>Amendes: ${fam.penalites}`);
+
+                    // Ajouter à la liste sidebar
+                    listHtml += `
+                            <li class="${rowClass}">
+                                <span><i class="fas fa-user"></i> ${fam.nom}</span>
+                                <div>
+                                    ${penaltyHtml}
+                                    <span class="badge ${badgeClass}">${badgeText}</span>
+                                </div>
+                            </li>`;
+                });
+                document.getElementById('family-list-container').innerHTML = listHtml;
+            })
+            .catch(e => console.log("Attente données..."));
+    }
+
+    // ---------------------------------------------------------
+    // 4. MISE À JOUR DU BUS (Temps réel)
+    // ---------------------------------------------------------
+    function updateBus() {
+        fetch('bus.json?t=' + Date.now())
+            .then(r => r.json())
+            .then(bus => {
+                // Positionner le Bus
+                if (busMarker) busMarker.setLatLng([bus.lat, bus.lon]);
+                else busMarker = L.marker([bus.lat, bus.lon], {icon: busIcon}).addTo(map);
+
+                // Mettre à jour le Dashboard
+                document.getElementById('lat-val').innerText = bus.lat.toFixed(4);
+                document.getElementById('lon-val').innerText = bus.lon.toFixed(4);
+                document.getElementById('bus-target').innerText = bus.target;
+
+                var statusBadge = document.getElementById('bus-status');
+                var notifBox = document.getElementById('notif-box');
+                var penaltyInfo = document.getElementById('penalty-info');
+
+                // Logique d'affichage selon le statut
+                if (bus.status === "MOVING" || bus.status === "RETURNING") {
+                    statusBadge.innerText = "EN ROUTE";
+                    statusBadge.style.background = "#27ae60"; // Vert
+                    document.getElementById('bus-eta').innerText = bus.eta + " s";
+
+                    penaltyInfo.style.display = "none";
+                    notifBox.style.display = "none";
+
+                } else if (bus.status === "STOPPED") {
+                    statusBadge.innerText = "ARRÊT";
+                    statusBadge.style.background = "#c0392b"; // Rouge
+                    document.getElementById('bus-eta').innerText = "ARRIVÉ";
+
+                    // Afficher compteur
+                    penaltyInfo.style.display = "block";
+                    document.getElementById('counter-val').innerText = bus.counter + "s";
+
+                    // Notification visuelle
+                    notifBox.style.display = "block";
+                    if (bus.penalty) {
+                        notifBox.className = "alert-box alert-red";
+                        notifBox.innerHTML = `🚨 <b>RETARD !</b> (${bus.counter}s)<br>Amende appliquée`;
+                    } else {
+                        notifBox.className = "alert-box alert-green";
+                        notifBox.innerHTML = `✅ <b>OK</b> (${bus.counter}s)<br>Élève monté à temps`;
+                    }
+                } else {
+                    statusBadge.innerText = "AU GARAGE";
+                    statusBadge.style.background = "#7f8c8d"; // Gris
+                    document.getElementById('bus-eta').innerText = "--";
+                }
+            })
+            .catch(e => {});
+    }
+
+    // ---------------------------------------------------------
+    // BOUCLES DE RAFRAÎCHISSEMENT
+    // ---------------------------------------------------------
+    setInterval(loadFamilies, 1500); // Liste familles : toutes les 1.5s
+    setInterval(updateBus, 500);     // Bus GPS : toutes les 0.5s (Fluide)
+    loadFamilies(); // Premier chargement immédiat
+</script>
+</body>
+</html>
