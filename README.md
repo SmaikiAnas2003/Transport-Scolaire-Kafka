@@ -58,15 +58,15 @@ Le système notifie l'opérateur de la prochaine destination choisie par l'algor
 
 ### 2. Ajout Dynamique (Temps Réel)
 Injection d'une nouvelle famille dans le système sans interruption de service.
-![Ajout Dynamique](./ajout_dynamique.png)
+![Ajout Dynamique](screenshots/ajout_dynamique.png)
 
 ### 3. Succès du Ramassage (Cas Nominal)
 Validation visuelle lorsque l'élève monte dans les temps (< 5s).
-![Succès](./frontend_succes.png)
+![Succès](screenshots/frontend_succes.png)
 
 ### 4. Gestion des Infractions (Pénalité)
 Alerte critique rouge générée par le flux Kafka lors d'un retard (> 5s).
-![Retard](./frontend_retard.png)
+![Retard](screenshots/frontend_retard.png)
 
 ---
 
