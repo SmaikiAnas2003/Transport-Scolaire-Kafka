@@ -54,7 +54,7 @@ L'interface permet d'injecter de nouvelles données pendant la simulation.
 
 ### 1. Prédiction et Routing Intelligent
 Le système notifie l'opérateur de la prochaine destination choisie par l'algorithme serveur.
-![Notification Destination](./frontend_destination.png)
+![Notification Destination](screenshots/frontend_destination.png)
 
 ### 2. Ajout Dynamique (Temps Réel)
 Injection d'une nouvelle famille dans le système sans interruption de service.
